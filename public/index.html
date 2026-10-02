@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Frog Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">Frog <em>Hub</em></div>
+      <div class="sub">Frog Pubs · 8 pubs</div>
+    </div>
+    <div class="side-label">Workspace</div>
+    <nav id="nav" aria-label="Workspaces"></nav>
+    <div class="pubpick" id="pubpick" hidden>
+      <label for="pub">Pub</label>
+      <select id="pub"></select>
+    </div>
+    <div class="side-foot">
+      <div class="sync"><span class="live"></span>All sources synced · 05:58</div>
+      <button class="linkish" id="open-defs">Definitions</button>
+      <button class="linkish" id="open-api">Hub API</button>
+      <div class="demo-tag">Zuri Solutions · prototype on demo data</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <div class="top-l">
+        <div class="eyebrow" id="role"></div>
+        <h1 id="title">Frog Hub</h1>
+        <p class="lede" id="lede"></p>
+      </div>
+      <div class="top-r">
+        <label class="datepick">Business day <select id="date"></select></label>
+        <button class="ghost cp-toggle" id="cp-toggle" type="button" title="Show or hide Frog Copilot">Copilot</button>
+      </div>
+    </header>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
+    <div id="page" class="grid"></div>
+  </main>
+
+  <aside class="copilot" id="copilot" aria-label="Frog Copilot">
+    <div class="cp-head">
+      <div>
+        <div class="cp-title">Frog Copilot</div>
+        <div class="cp-sub" id="cp-status">…</div>
+      </div>
+      <div class="cp-actions">
+        <button class="ghost" id="cp-reset" title="New conversation">New</button>
+        <button class="ghost cp-close" id="cp-close" aria-label="Close Copilot">✕</button>
+      </div>
+    </div>
+    <div class="cp-log" id="cp-log" aria-live="polite"></div>
+    <div class="cp-suggest" id="cp-suggest"></div>
+    <form class="cp-form" id="cp-form">
+      <textarea id="cp-input" rows="2" placeholder="Ask about any figure, procedure or tool… (FR / EN)"></textarea>
+      <button type="submit" class="primary" id="cp-send">Ask</button>
+    </form>
+  </aside>
+  <button class="cp-fab" id="cp-fab">Copilot</button>
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="drawer" id="drawer" hidden aria-label="Details"></aside>
+  <div class="toast" id="toast" role="status" hidden></div>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "frog-hub-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frog Hub: automations on top of the central data hub + Frog Copilot (Claude + RAG)",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node scripts/selftest.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0"
+  }
+}
