@@ -13,6 +13,7 @@ import * as workspaces from "./lib/workspaces.mjs";
 import * as actions from "./lib/actions.mjs";
 import * as automations from "./lib/automations.mjs";
 import * as agents from "./lib/agents.mjs";
+import * as processes from "./lib/processes.mjs";
 import * as rag from "./lib/rag.mjs";
 import * as copilot from "./lib/copilot.mjs";
 
@@ -35,6 +36,15 @@ const DATA = {
   bookings: (q) => hub.bookings(q),
   corporate: (q) => hub.corporate(q),
   alerts: (q) => hub.alerts(q),
+  "booking-day": (q) => hub.bookingDay(q),
+  closures: (q) => hub.closures(q),
+  phone: (q) => hub.phone(q),
+  visits: (q) => hub.visits(q),
+  "member-spend": (q) => hub.memberSpend(q),
+  menu: (q) => hub.menu(q),
+  vouchers: (q) => hub.vouchers(q),
+  checklists: (q) => (q.pub ? hub.checklists(q) : hub.checklistsGroup(q)),
+  "open-points": (q) => processes.points(q),
   definitions: () => hub.DEFINITIONS,
 };
 
@@ -63,7 +73,19 @@ const server = http.createServer(async (req, res) => {
       if (type === "mr" && status === "sent") { const [pub, date] = id.split("|"); automations.fire("mr.sent", { pub, date, notes: entry.notes }); }
       if (type === "invoice" && status === "disputed") automations.fire("invoice.disputed", { id });
       if (type === "invoice" && status === "approved") automations.fire("invoice.approved", { id });
+      if (type === "booking" && status !== "undo") automations.fire("booking.decided", { id, status });
       return send(res, 200, entry);
+    }
+    if (p === "/api/waste" && req.method === "POST") {
+      const body = await readJson(req);
+      const w = hub.addWaste(body);
+      automations.fire("waste.added", { date: w.date, waste: w });
+      return send(res, 200, w);
+    }
+    if (p === "/api/menu" && req.method === "POST") {
+      const change = hub.setMenuPrice(await readJson(req));
+      automations.fire("menu.changed", change);
+      return send(res, 200, change);
     }
     if (p === "/api/pulse" && req.method === "POST") return send(res, 200, agents.answerPulse(await readJson(req)));
     // automations
@@ -107,7 +129,7 @@ const server = http.createServer(async (req, res) => {
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return send(res, 404, "Not found", "text/plain");
     return send(res, 200, fs.readFileSync(file), TYPES[path.extname(file)] || "application/octet-stream");
   } catch (e) {
-    const status = /Unknown|No data|must be|too large|JSON|Action id|Decision|Threshold|Scores|role/.test(e.message) ? 400 : 500;
+    const status = /Unknown|No data|No bookings|must be|too large|JSON|Action id|Decision|Threshold|Scores|role/.test(e.message) ? 400 : 500;
     if (status === 500) console.error(e);
     return send(res, status, { error: e.message });
   }

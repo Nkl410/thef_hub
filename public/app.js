@@ -1,5 +1,5 @@
 /* Frog Hub front end: one workspace per role, organised in tabs.
-   Routes: #/ws/<workspace>[/<pub>][?tab=<tab>] · #/definitions · #/api */
+   Routes: #/ws/<workspace>[/<pub>][?tab=<tab>&<filter>=<value>…] · #/definitions · #/api */
 
 const $ = (s) => document.querySelector(s);
 const h = (tag, attrs = {}, ...kids) => {
@@ -15,41 +15,49 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
 };
-const ICON = { done: "✓" }; // other steps show their number
-
 let META = null;
 let WS = null; // current workspace payload
-const state = { ws: store.get("frog-ws") || "ceo", pub: store.get("frog-pub") || "xvi", agent: "close", tab: null, date: null, page: "ws" };
-const paramOf = (ws) => META.workspaces.find((w) => w.id === ws)?.param; // "pub" for managers, "agent" for an agent page
+const state = { ws: store.get("frog-ws") || "manager", pub: store.get("frog-pub") || "xvi", agent: "close", tab: null, q: {}, date: null, page: "ws", pointsOpen: null };
+const paramOf = (ws) => META.workspaces.find((w) => w.id === ws)?.param; // "pub" for the pub team, "agent" for an agent page
 
 /* ---------- routing ---------- */
 
 function parseHash() {
   const [path, query] = location.hash.replace(/^#\/?/, "").split("?");
   const [page, a, b] = path.split("/");
-  const tab = new URLSearchParams(query || "").get("tab");
+  const params = Object.fromEntries(new URLSearchParams(query || ""));
+  const { tab = null, ...q } = params;
   if (page === "definitions" || page === "api") return { page };
-  return { page: "ws", ws: META.workspaces.some((w) => w.id === a) ? a : state.ws, param: b, tab };
+  return { page: "ws", ws: META.workspaces.some((w) => w.id === a) ? a : state.ws, param: b, tab, q };
 }
-const wsHref = (ws, param, tab) => { const k = paramOf(ws); return `#/ws/${ws}${k ? `/${param || state[k]}` : ""}${tab ? `?tab=${tab}` : ""}`; };
+const wsHref = (ws, param, tab, q = {}) => {
+  const k = paramOf(ws);
+  const qs = new URLSearchParams(Object.entries({ tab, ...q }).filter(([, v]) => v != null && v !== "")).toString();
+  return `#/ws/${ws}${k ? `/${param || state[k]}` : ""}${qs ? `?${qs}` : ""}`;
+};
 window.addEventListener("hashchange", () => render());
 
-/* ---------- sidebar ---------- */
+/* ---------- sidebar: roles grouped as Frog is organised ---------- */
 
 function buildNav() {
   const nav = $("#nav"); nav.innerHTML = "";
-  let hubLabel = false;
+  let group = null;
   for (const w of META.workspaces) {
     if (w.hidden) continue;
-    if (w.hub && !hubLabel) { hubLabel = true; nav.append(h("div", { class: "side-label hub" }, "Hub")); }
-    const initials = w.id === "agents" ? "AG" : w.id === "delivery" ? "DL" : w.label.split(/\s+/).filter((x) => /\w/.test(x)).map((x) => x[0]).join("").slice(0, 2).toUpperCase();
-    nav.append(h("a", { class: "navitem", href: wsHref(w.id), "aria-current": state.page === "ws" && (state.ws === w.id || (state.ws === "agent" && w.id === "agents")) ? "page" : null },
-      h("span", { class: "avatar" }, ICONS[w.id] ? icon(w.id) : initials), h("span", { class: "nl" }, h("b", {}, w.label), h("small", {}, w.role))));
+    if (w.group !== group) { group = w.group; nav.append(h("div", { class: "side-label" }, group)); }
+    const current = state.page === "ws" && (state.ws === w.id || (state.ws === "agent" && w.id === "agents"));
+    const badge = w.id === "points" && state.pointsOpen ? h("span", { class: "nav-badge" }, state.pointsOpen) : null;
+    nav.append(h("a", { class: "navitem", href: wsHref(w.id), "aria-current": current ? "page" : null },
+      h("span", { class: "mono" }, w.mono), h("span", { class: "nl" }, h("b", {}, w.label), h("small", {}, w.role)), badge));
+    if (w.param === "pub") {
+      const pick = h("div", { class: "pubpick" }, h("label", { for: "pub" }, "Pub"), pubSel);
+      pick.hidden = !current;
+      nav.append(pick);
+    }
   }
-  const ws = META.workspaces.find((w) => w.id === state.ws);
-  $("#pubpick").hidden = !(state.page === "ws" && ws?.param === "pub");
-  $("#pub").value = state.pub;
+  pubSel.value = state.pub;
 }
+let pubSel = null; // the pub selector, moved under "Pub team" in the sidebar
 
 /* ---------- data ---------- */
 
@@ -69,6 +77,7 @@ async function render({ keepScroll = false } = {}) {
     const k = paramOf(r.ws);
     const changed = r.ws !== state.ws || (k && r.param && r.param !== state[k]);
     state.ws = r.ws; if (k && r.param) state[k] = r.param; state.tab = r.tab || (changed ? null : state.tab);
+    state.q = r.q;
     store.set("frog-ws", state.ws); store.set("frog-pub", state.pub);
   }
   buildNav();
@@ -78,9 +87,12 @@ async function render({ keepScroll = false } = {}) {
   if (r.page === "api") return renderApi();
   const y = window.scrollY;
   try {
-    WS = await getJSON(`/api/workspace/${state.ws}?date=${state.date}&pub=${state.pub}&agent=${state.agent}`);
+    const q = new URLSearchParams({ date: state.date, pub: state.pub, agent: state.agent, ...state.q });
+    WS = await getJSON(`/api/workspace/${state.ws}?${q}`);
+    if (WS.nav && WS.nav.points !== state.pointsOpen) { state.pointsOpen = WS.nav.points; buildNav(); }
     renderWorkspace(WS);
     if (keepScroll) window.scrollTo(0, y);
+    else if (state.q.focus) focusPoint(state.q.focus);
   } catch (e) {
     $("#page").innerHTML = ""; $("#page").append(h("div", { class: "card" }, "Could not load this workspace: " + e.message));
   }
@@ -95,13 +107,12 @@ function setHeader(role, title, lede) {
 }
 
 function renderWorkspace(w) {
-  const pubName = w.needsPub ? META.pubs.find((p) => p.id === state.pub)?.name : "";
-  setHeader(w.id === "agent" ? "Frog's agents" : `${w.label === w.people ? w.role : `${w.label} · ${w.people}`}${pubName ? " · " + pubName : ""}`, w.greeting, w.text);
+  setHeader(w.id === "agent" ? "Programme · Agents & automations" : `${w.group} · ${w.role}`, w.greeting, w.text);
   const tab = w.tabs.find((t) => t.id === state.tab) || w.tabs[0];
   state.tab = tab.id;
   const tabs = $("#tabs"); tabs.innerHTML = "";
   for (const t of w.tabs) {
-    tabs.append(h("a", { role: "tab", href: wsHref(state.ws, state.pub, t.id), "aria-selected": String(t.id === tab.id) }, t.label, t.badge ? h("span", { class: "tab-badge" }, t.badge) : null));
+    tabs.append(h("a", { role: "tab", href: wsHref(state.ws, state.ws === "agent" ? state.agent : state.pub, t.id, t.id === tab.id ? state.q : {}), "aria-selected": String(t.id === tab.id) }, t.label, t.badge ? h("span", { class: "tab-badge" }, t.badge) : null));
   }
   const page = $("#page"); page.innerHTML = "";
   for (const s of tab.sections) page.append(section(s));
@@ -122,6 +133,7 @@ const card = (s, ...kids) => h("section", { class: "card" },
 
 async function act(item, a, btn) {
   if (a.copilot) return ask(a.copilot);
+  if (a.href) { location.hash = a.href; return; }
   btn.disabled = true;
   if (item.type === "op") { // automation operation waiting for an OK
     await post("/api/automations/decide", { id: item.id, status: a.status });
@@ -135,9 +147,103 @@ async function act(item, a, btn) {
 }
 
 const SECTION = {
+  // summary strip: figures in one bordered row, the caption above
   hero(s) {
-    return h("section", { class: "hero" }, h("div", { class: "hero-label" }, h("span", { class: "tick" }, "✓"), s.label || "Overnight"),
-      h("div", { class: "hero-row" }, s.counters.map((c) => h(c.href ? "a" : "div", { class: "counter" + (c.href ? " link" : ""), href: c.href || null }, h("b", {}, c.value), h("span", {}, c.label + (c.href ? " →" : ""))))));
+    return h("section", { class: "strip" }, s.label ? h("div", { class: "strip-label" }, s.label) : null,
+      h("div", { class: "strip-row" }, s.counters.map((c) => h(c.href ? "a" : "div", { class: "counter" + (c.href ? " link" : ""), href: c.href || null }, h("b", {}, c.value), h("span", {}, c.label)))));
+  },
+  notice(s) {
+    return h("section", { class: `notice ${s.tone || "info"}` }, h("div", {}, h("b", {}, s.title), s.text ? h("p", {}, s.text) : null),
+      s.link ? h("a", { class: "notice-link", href: s.link.href }, s.link.label) : null);
+  },
+  // segmented filters that live in the URL, so a filtered view can be shared
+  filters(s) {
+    return h("section", { class: "filters" }, s.items.map((f) => h("div", { class: "filter" }, h("span", { class: "label" }, f.label),
+      h("div", { class: "seg", role: "group", "aria-label": f.label }, f.options.map(([v, l]) => h("a", { href: wsHref(state.ws, state.pub, state.tab, { ...state.q, [f.param]: v, focus: undefined }), "aria-pressed": String(v === f.value) }, l))))));
+  },
+  agenda(s) {
+    const total = s.groups.reduce((n, g) => n + g.items.length, 0);
+    if (!total) return card(s, h("p", { class: "empty" }, s.empty));
+    const legend = h("div", { class: "legend kinds" }, [["table", "Table · Zenchef"], ["darts", "Darts · SimplyBook"], ["group", "Group · BookingShake"], ["phone", "Taken by the AI receptionist"]].map(([k, l]) => h("span", {}, h("i", { class: `k-${k}` }), l)));
+    return card({ ...s, badge: legend }, ...s.groups.map((g) => h("div", { class: "ag-group" },
+      h("div", { class: "ag-group-head" }, h("span", { class: "label" }, g.label), g.covers != null ? h("span", { class: "muted" }, `${g.covers} guests`) : null),
+      h("ul", { class: "agenda" }, g.items.map((i) => h("li", { class: `k-${i.kindLabel === "Phone" ? "phone" : i.kind}${i.done ? " is-done" : ""}${i.cancelled ? " is-cancelled" : ""}` },
+        h("span", { class: "a-time" }, i.time),
+        h("span", { class: "a-kind" }, i.kindLabel),
+        h("div", { class: "a-main" }, h("b", {}, i.title), h("small", {}, i.meta), i.tags.length ? h("div", { class: "a-tags" }, i.tags.map(chipEl)) : null),
+        h("div", { class: "q-act" }, i.done ? h("span", { class: "done-label" }, i.done.label) : i.actions.map((a) => {
+          const btn = h("button", { class: a.style === "primary" ? "primary" : "ghost", type: "button" }, a.label);
+          btn.addEventListener("click", () => act(i, a, btn));
+          return btn;
+        }))))))));
+  },
+  // waste typed once at the end of the shift, posted to the Yokitup stock
+  wasteform(s) {
+    const item = h("select", { "aria-label": "Item" }, s.items.map(([k, l]) => h("option", { value: k }, l)));
+    const qty = h("input", { type: "number", min: "1", max: "200", step: "1", value: "1", "aria-label": "Quantity", style: "width:90px;min-width:0" });
+    const reason = h("select", { "aria-label": "Reason" }, s.reasons.map((r) => h("option", { value: r }, r)));
+    const add = h("button", { class: "primary", type: "button" }, "Record and send to Yokitup");
+    add.addEventListener("click", async () => {
+      add.disabled = true;
+      try {
+        const w = await post("/api/waste", { pub: s.pub, date: s.date, item: item.value, qty: +qty.value, reason: reason.value });
+        toast(`${w.qty} ${w.unit} ${w.itemName}: out of the Yokitup stock`);
+        render({ keepScroll: true });
+      } catch (e) { toast(e.message); add.disabled = false; }
+    });
+    return card(s, h("div", { class: "b-row" }, item, qty, reason, add));
+  },
+  menu(s) {
+    const tone = { "In sync": "good", "Price differs in Zelty": "attention", "Missing in Zelty": "bad" };
+    const money = (x) => (x == null ? "—" : `€${x.toFixed(2)}`);
+    const rows = s.lines.map((l) => {
+      const pint = h("input", { type: "number", step: "0.5", min: "2", max: "20", value: l.frogSpace.pint, "aria-label": `${l.beer} pint price` });
+      const half = h("input", { type: "number", step: "0.5", min: "2", max: "20", value: l.frogSpace.half, "aria-label": `${l.beer} half price` });
+      const save = h("button", { class: l.status === "In sync" ? "ghost" : "primary", type: "button" }, l.status === "In sync" ? "Save" : "Send to both");
+      save.addEventListener("click", async () => {
+        save.disabled = true;
+        try { await post("/api/menu", { pub: s.pub, tap: l.tap, pint: +pint.value, half: +half.value }); toast(`${l.beer}: sent to Zelty and Frog Space`); render({ keepScroll: true }); }
+        catch (e) { toast(e.message); save.disabled = false; }
+      });
+      return h("tr", {}, h("td", { class: "muted" }, l.tap), h("td", {}, h("b", {}, l.beer), h("small", { class: "sub" }, `${l.style} · ${l.abv} %${l.house ? " · Frog beer" : ""}`)),
+        h("td", {}, pint), h("td", {}, half), h("td", { class: l.status === "In sync" ? "muted" : "attention" }, l.zelty ? `${money(l.zelty.pint)} / ${money(l.zelty.half)}` : "not on the till"),
+        h("td", {}, chipEl({ chip: l.status, tone: tone[l.status] })), h("td", {}, save));
+    });
+    return card(s, h("div", { class: "tw", style: "max-height:none" }, h("table", { class: "menu-table" },
+      h("thead", {}, h("tr", {}, ["Tap", "Beer", "Pint", "Half", "In Zelty today", "Status", ""].map((c) => h("th", {}, c)))), h("tbody", {}, rows))));
+  },
+  points(s) {
+    if (!s.items.length) return card(s, h("p", { class: "empty" }, s.empty || "No open point."));
+    const one = (p) => {
+      const d = h("details", { class: `point ${p.attention ? "open-point" : ""}`, id: `pt-${p.id}` },
+        h("summary", {}, h("span", { class: "pt-id" }, p.id),
+          h("div", { class: "pt-txt" }, h("b", {}, p.title), h("small", {}, `${p.system} · ${p.owner}`)),
+          chipEl({ chip: p.decision ? `Chosen: ${p.decision.name}` : p.statusLabel, tone: p.decision ? "good" : p.tone })),
+        h("div", { class: "pt-body" },
+          h("dl", { class: "dr-fields" },
+            h("dt", {}, "The problem"), h("dd", {}, p.problem),
+            h("dt", {}, "Frog Hub today"), h("dd", {}, p.hub),
+            p.open ? h("dt", {}, "Still open") : null, p.open ? h("dd", {}, p.open) : null,
+            h("dt", {}, "Source"), h("dd", { class: "muted" }, `pain-process.md · ${p.source}`)),
+          p.links.length ? h("div", { class: "actions" }, p.links.map((l) => h("a", { class: "btn", href: wsHref(l.ws, l.pub, l.tab) }, `Open ${l.label}`))) : null,
+          p.options?.length ? h("div", {}, h("h3", { class: "sub" }, `Methods to choose from · decided by ${p.decider}`),
+            h("div", { class: "options" }, p.options.map((o) => {
+              const chosen = p.decision?.option === o.id;
+              const btn = chosen
+                ? h("button", { class: "ghost", type: "button", onclick: async () => { await post("/api/action", { type: "method", id: p.id, status: "undo" }); render({ keepScroll: true }); } }, "Undo the choice")
+                : h("button", { class: p.decision ? "ghost" : "primary", type: "button", onclick: async () => { await post("/api/action", { type: "method", id: p.id, status: o.id }); toast(`${p.id}: ${o.name} chosen`); render({ keepScroll: true }); } }, "Choose this method");
+              return h("article", { class: "option" + (chosen ? " chosen" : "") },
+                h("div", { class: "op-head" }, h("span", { class: "op-id" }, o.id.toUpperCase()), h("b", {}, o.name), p.recommended === o.id ? chipEl({ chip: "Recommended", tone: "info" }) : null, h("span", { class: "chip muted" }, `effort ${o.effort}`)),
+                h("p", {}, o.how), h("p", { class: "pc" }, h("span", { class: "label" }, "For"), " ", o.pros), h("p", { class: "pc" }, h("span", { class: "label" }, "Against"), " ", o.cons), btn);
+            }))) : null));
+      d.addEventListener("toggle", () => { if (d.open) state.lastPoint = p.id; });
+      if (state.lastPoint === p.id || state.q.focus === p.id) d.open = true;
+      return d;
+    };
+    if (!s.grouped) return card(s, h("div", { class: "point-list" }, s.items.map(one)));
+    const by = {};
+    for (const p of s.items) (by[p.tab] ||= []).push(p);
+    return h("section", { class: "point-groups" }, Object.entries(by).map(([tab, list]) => card({ title: tab, badge: h("span", { class: "muted" }, `${list.length} point${list.length > 1 ? "s" : ""}`) }, h("div", { class: "point-list" }, list.map(one)))));
   },
   kpis(s) {
     return h("section", { class: "kpis" }, s.items.map((t) => {
@@ -152,11 +258,11 @@ const SECTION = {
     const box = h("section", { class: "card flow" },
       h("div", { class: "card-head" }, h("h2", {}, s.title), h("span", { class: done === s.steps.length ? "allclear" : "progress-label" }, done === s.steps.length ? "Service closed" : `${done} of ${s.steps.length} done`)),
       h("div", { class: "progress" }, h("div", { style: `width:${(100 * done) / s.steps.length}%` })));
-    if (done === s.steps.length) box.append(h("div", { class: "clear" }, h("span", { class: "tick big" }, "✓"), "Everything is closed for tonight."));
+    if (done === s.steps.length) box.append(h("p", { class: "clear" }, "Everything is closed for tonight."));
     for (const [n, st] of s.steps.entries()) {
       const open = st.id === openId && st.sections.length;
       const d = h("details", { class: `step ${st.state}`, open: open || null },
-        h("summary", { class: st.sections.length ? "" : "static" }, h("span", { class: "ci" }, ICON[st.state] || n + 1), h("div", { class: "st-txt" }, h("b", {}, st.label), h("p", {}, st.text)), h("span", { class: `badge ${st.state}` }, st.badge)),
+        h("summary", { class: st.sections.length ? "" : "static" }, h("span", { class: "ci" }, n + 1), h("div", { class: "st-txt" }, h("b", {}, st.label), h("p", {}, st.text)), h("span", { class: `badge ${st.state}` }, st.badge)),
         st.sections.length ? h("div", { class: "step-body" }, st.sections.map((x) => SECTION[x.type](x, true))) : null);
       d.addEventListener("toggle", () => { if (d.open) store.set(`frog-step-${state.pub}`, st.id); });
       box.append(d);
@@ -167,7 +273,7 @@ const SECTION = {
     const open = s.items.filter((i) => !i.done);
     const badge = s.neutral ? h("span", { class: "chip muted" }, `${s.items.length} ${s.neutral}`) : open.length ? h("span", { class: "count" }, `${open.length} to do`) : h("span", { class: "allclear" }, "No action needed");
     const head = inline ? {} : { ...s, badge };
-    if (!s.items.length) return card(head, h("div", { class: "clear" }, h("span", { class: "tick big" }, "✓"), s.empty));
+    if (!s.items.length) return card(head, h("p", { class: "clear" }, s.empty));
     const limit = s.limit || 6;
     const items = [...open, ...s.items.filter((i) => i.done)]; // done items sink to the bottom
     const list = h("ul", { class: "queue" }, items.map((i, n) => h("li", { class: (i.done ? "is-done" : "") + (i.drawer ? " has-drawer" : ""), hidden: n >= limit ? true : null, "data-extra": n >= limit ? "1" : null },
@@ -197,7 +303,7 @@ const SECTION = {
   },
   table(s) { return card(s, table(s.cols, s.rows)); },
   downloads(s) {
-    return card(s, h("div", { class: "downloads" }, s.items.map((d) => h("a", { class: "dl", href: d.href, onclick: () => toast(`Downloading ${d.label}`) }, h("span", { class: "dl-i" }, "↓"), h("span", {}, h("b", {}, d.label), h("small", {}, d.note))))));
+    return card(s, h("div", { class: "downloads" }, s.items.map((d) => h("a", { class: "dl", href: d.href, onclick: () => toast(`Downloading ${d.label}`) }, h("span", { class: "dl-i" }, "CSV"), h("span", {}, h("b", {}, d.label), h("small", {}, d.note))))));
   },
   form(s) {
     if (s.sent) return h("div", { class: "form" }, h("p", { class: "note" }, `Sent to head office at ${s.sent.at} with your notes.`), s.sent.notes ? h("pre", { class: "sent-notes" }, s.sent.notes) : null, h("div", { class: "actions" }, h("a", { class: "btn", href: s.export }, "Download the report (CSV)")));
@@ -377,20 +483,13 @@ Object.assign(SECTION, {
   },
 });
 
-/* ---------- icons (line, 24 px grid) ---------- */
-const ICONS = {
-  ceo: "M4 19V5M4 19h16M7 15l4-5 3 3 5-6", finance: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3",
-  manager: "M5 8h10v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 11h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2M5 8c0-2.2 2-3.5 5-3.5S15 5.8 15 8",
-  ops: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4", marketing: "M4 10v4h3l7 4V6L7 10zM17 9a3 3 0 0 1 0 6",
-  data: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
-  scorecard: "M4 17a8 8 0 1 1 16 0M12 17l4.5-5.5M4 17h2M18 17h2M12 9V7", agents: "M8 8h8v8H8zM10.5 4v4M13.5 4v4M10.5 16v4M13.5 16v4M4 10.5h4M4 13.5h4M16 10.5h4M16 13.5h4",
-  delivery: "M6 21V4M6 4h11l-2.5 4L17 12H6",
-};
-function icon(name) {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("class", "i"); svg.setAttribute("aria-hidden", "true");
-  const p = document.createElementNS(ns, "path"); p.setAttribute("d", ICONS[name]); svg.append(p);
-  return svg;
+// open and scroll to a point linked from elsewhere (…&focus=P03)
+function focusPoint(id) {
+  const el = document.getElementById(`pt-${id}`);
+  if (!el) return;
+  el.open = true;
+  el.classList.add("flash");
+  requestAnimationFrame(() => el.scrollIntoView({ block: "start", behavior: "smooth" }));
 }
 
 /* ---------- scorecard ---------- */
@@ -406,7 +505,7 @@ function sparkline(series, k) {
   const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
   const x = (i) => 2 + (i * (W - 4)) / (series.length - 1), y = (v) => H - 3 - ((v - lo) / span) * (H - 6);
   const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "spark", role: "img", "aria-label": `Weekly trend: ${series.join(", ")}` });
-  if (k.target != null) svg.append(svgEl("line", { x1: 0, x2: W, y1: y(k.target), y2: y(k.target), stroke: "var(--brass)", "stroke-dasharray": "2 3", "stroke-width": 1 }));
+  if (k.target != null) svg.append(svgEl("line", { x1: 0, x2: W, y1: y(k.target), y2: y(k.target), stroke: "var(--accent)", "stroke-dasharray": "2 3", "stroke-width": 1 }));
   svg.append(svgEl("polyline", { points: series.map((v, i) => `${x(i)},${y(v)}`).join(" "), fill: "none", stroke: "var(--brand)", "stroke-width": 1.8, "stroke-linejoin": "round" }));
   svg.append(svgEl("circle", { cx: x(series.length - 1), cy: y(series.at(-1)), r: 2.6, fill: "var(--brand)" }));
   return svg;
@@ -442,7 +541,7 @@ Object.assign(SECTION, {
     const t = h("table", { class: "heat" },
       h("thead", {}, h("tr", {}, h("th", { class: "p" }, "Pub"), s.cols.map((c) => h("th", {}, c.name, h("span", { class: "tg" }, c.target == null ? "trend" : `target ${fmtK(c.target, c.unit)}`))))),
       h("tbody", {},
-        s.rows.map((r) => h("tr", {}, h("td", { class: "p", onclick: () => { location.hash = wsHref("manager", r.pub, "scorecard"); } }, r.name, h("small", {}, "GM " + r.gm)), r.cells.map((c, i) => h("td", { class: c.status }, fmtK(c.value, s.cols[i].unit))))),
+        s.rows.map((r) => h("tr", {}, h("td", { class: "p", onclick: () => { location.hash = wsHref("manager", r.pub, "close"); } }, r.name, h("small", {}, "GM " + r.gm)), r.cells.map((c, i) => h("td", { class: c.status }, fmtK(c.value, s.cols[i].unit))))),
         h("tr", { class: "group" }, h("td", { class: "p" }, "Group"), s.group.map((v, i) => h("td", {}, fmtK(v, s.cols[i].unit))))));
     return card(s, h("div", { class: "tw", style: "max-height:none" }, t));
   },
@@ -514,7 +613,7 @@ function chart(blk) {
   const top = Math.ceil(max / step) * step;
   const x = (i) => L + (i * (W - L - R)) / Math.max(1, blk.labels.length - 1);
   const y = (val) => T + (H - T - B) * (1 - val / top);
-  const STY = { main: ["var(--brand)", 3, ""], target: ["var(--brass)", 1.8, "2 4"], dash: ["var(--ink-3)", 1.4, "6 4"] };
+  const STY = { main: ["var(--brand)", 3, ""], target: ["var(--accent)", 1.8, "2 4"], dash: ["var(--ink-3)", 1.4, "6 4"] };
   const ns = "http://www.w3.org/2000/svg";
   const s = (tag, a) => { const e = document.createElementNS(ns, tag); for (const k in a) e.setAttribute(k, a[k]); return e; };
   const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": blk.title });
@@ -558,6 +657,7 @@ function openDrawer(d, item) {
   dr.replaceChildren(...[
     h("div", { class: "dr-head" }, h("div", {}, h("h2", {}, d.title), d.subtitle ? h("small", {}, d.subtitle) : null), h("button", { class: "ghost", type: "button", "aria-label": "Close", onclick: closeDrawer }, "✕")),
     d.fields?.length ? h("dl", { class: "dr-fields" }, d.fields.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])) : null,
+    d.transcript ? h("div", {}, h("h3", { class: "sub" }, "Transcript"), h("ol", { class: "transcript" }, d.transcript.map(([who, text]) => h("li", { class: who === "AI" ? "ai" : "guest" }, h("span", { class: "label" }, who === "AI" ? "AI receptionist" : "Guest"), h("p", {}, text))))) : null,
     d.content || null,
     d.table ? table(d.table.cols, d.table.rows) : null,
     d.payload ? payloadView(d.payload) : null,
@@ -605,9 +705,10 @@ function updateSuggestions() {
   const S = {
     ceo: ["How did the group do yesterday?", "Which pub is furthest from budget this month, and why?", "Compare labour cost across the 8 pubs", "Quels événements de groupe cette semaine ?"],
     finance: ["Résume les encaissements de la semaine dernière par mode de paiement", "Which invoices still need a decision?", "Quels acomptes corporate restent à recevoir ?", "Where is the beer duty ledger at?"],
-    manager: [`Comment s'est passé le service d'hier à ${pubName} ?`, `Who are the Club Frog leaders at ${pubName} this week?`, "Comment faire une addition partagée avec Club Frog ?", `Quel est le panier moyen par client à ${pubName} selon le moment de la journée ?`],
-    ops: ["Which group events are coming up, and are they paid?", "Bookings by pub and channel this month", "Quels pubs ont des fléchettes ?"],
-    marketing: ["Taux Club Frog par pub et par service cette semaine", "Do members spend more than non-members?", "Which channel brings the most bookings?"],
+    manager: [`Quelles réservations ce soir à ${pubName} ?`, `Comment s'est passé le service d'hier à ${pubName} ?`, `Which shift manager at ${pubName} has the best Club Frog rate this week?`, "Comment faire une addition partagée avec Club Frog ?"],
+    ops: ["Which group events are coming up, and are they paid?", "Quels pubs ont fermé les réservations en ligne ce mois-ci ?", "What did the AI receptionist do this week?"],
+    marketing: ["Taux Club Frog par manager de shift cette semaine", "Combien de membres ont gagné une récompense de 5e visite ?", "How much ad spend went to a closed booking calendar?"],
+    points: ["Quels points restent à décider, et par qui ?", "Which method do you recommend for bank reconciliation, and why?", "What does Frog Hub do about Trail and waste?"],
     agents: ["Qu'est-ce qui a été envoyé à Combo ce matin ?", "Which agents are waiting for an OK?", "Pourquoi le planning recommandé ajoute des heures samedi ?"],
     agent: ["Qu'a fait cet agent aujourd'hui ?", "How is its impact counted?", "What does it send, and to which tool?"],
     delivery: ["Combien d'heures les agents ont rendu ce mois-ci, par équipe ?", "Which agent should we build next, and why?", "What do the teams say about the hub?"],
@@ -718,7 +819,7 @@ function toggleCopilot() {
   }
   dateSel.value = state.date;
   dateSel.addEventListener("change", () => { state.date = dateSel.value; render({ keepScroll: true }); });
-  const pubSel = $("#pub");
+  pubSel = $("#pub");
   META.pubs.forEach((p) => pubSel.append(h("option", { value: p.id }, p.name)));
   pubSel.addEventListener("change", () => { location.hash = wsHref("manager", pubSel.value, state.tab); });
   $("#open-defs").addEventListener("click", () => { location.hash = "#/definitions"; });

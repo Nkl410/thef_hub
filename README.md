@@ -22,16 +22,21 @@ $env:ANTHROPIC_API_KEY = "sk-ant-..."; npm start
 
 ## Workspaces
 
-One workspace per role, organised in tabs (a number on a tab = items left to do). Each opens on what the hub did overnight, then lists the few items that need a person, with the action right there (Approve, Dispute, Checked, Send) and an Undo for a few seconds. Rows open a detail panel, figures jump to the tab that explains them, and ✦ Ask sends a ready-made question to Frog Copilot. Decisions are shared across workspaces.
+The sidebar follows Frog's organisation: **Pubs** (one Pub team workspace, pick a pub), **Head office** (one workspace per person or team) and **Programme** (what Zuri and Frog steer together). Tabs follow the rhythm of each role: tonight, close of service, the Monday routine, the month. A number on a tab = items left to do. Each tab opens on what needs a person, with the action right there (Validate, Approve, Dispute, Checked, Send) and an Undo; what the hub did alone is a one-line summary strip. Filters live in the URL, so a filtered view can be shared. Visual rules: `../DESIGN.md`.
 
-| Workspace | For | What they find |
+| Workspace | For | Tabs |
 | --- | --- | --- |
-| Paul | CEO | Group revenue vs budget, month by pub, the 8 pubs on the day with their Manager Report, business points for attention |
-| Finance | Jean-Bernard, Stella, Sahira | Week reconciled by payment mode, Sage / banking / payroll files to download, invoices to review, receivables, beer duty ledger |
-| Pub managers | GMs and SMs (pick a pub) | Guided close of service (cash-up, MR, hours, invoices), Guests (spend and pints per guest, food, regulars, best sellers per guest), Team, Invoices |
-| Operations & events | Tory | Bookings for the 8 pubs, upcoming group events with payment status and reminders, channels |
-| Marketing & CRM | Emma, Liz | Club Frog by pub, shift and server, member spend, booking channels and web conversion |
-| Data hub | Sébastien | Connectors and last sync, automatic data corrections, roll-out of the remaining APIs |
+| Pub team | GMs and SMs (pick a pub) | Tonight (all bookings of the service: tables, darts, groups, AI phone bookings, to validate; online-booking closure alert) · Close of service (cash-up, meal vouchers, MR, hours) · This week (rota and invoices to approve, tilrec, Club Frog by SM and server) · Phone · Beer menu · Team & guests · Open points |
+| Paul | CEO | Today · Pubs · Trends · Guests · Costs · Scorecard · Open points |
+| Tory | Operations, groups | Bookings (8 pubs, to validate) · Group events · Phone · Open points |
+| Emma & Liz | Club Frog, marketing | Club Frog report (day / 7 days / month, by pub, day, moment, server, shift manager) · Members (visits, 5th-visit rewards, member spend) · Acquisition · Channels & attribution (closures, ad spend) · Open points |
+| Accounting | Jean-Bernard, Stella, Sahira | To do · Takings · Meal vouchers · Bank reconciliation · Receivables & duty · Payroll · Open points |
+| Sébastien | Data and IT | Connectors · Data quality · Outbound · Open points |
+| Open points | Frog and Zuri | Every pain point of `knowledge/pain-process.md` with its status, and the methods to choose where the notes give no direct solution |
+
+## Open points (process notes)
+
+`lib/processes.mjs` lists the 38 pain points of `knowledge/pain-process.md`. Each has a status (in Frog Hub, partly covered, pilot to test, method to choose, to verify, outside the scope), what Frog Hub does today, what is still open, and links to the screen that handles it. Points without a direct solution in the notes carry two or three methods (how, for, against, effort, recommended, who decides); choosing one in the app records the decision. Attention points appear in the Open points workspace and in the Open points tab of each team.
 
 Decisions are kept in memory in this prototype (reset when the server restarts).
 
@@ -41,13 +46,13 @@ Frog Hub is the "agents in production" step of an AI-native transformation: seve
 
 | Agent | Works for | Job | Autonomy |
 | --- | --- | --- | --- |
-| 🌙 Close-of-service | SMs, GMs | Cash-up reconciled, Manager Report pre-filled and sent, hours synced | Prepares, SM confirms |
-| 🗓️ Rota (pilot) | GMs | Targets and recommended rota to Combo, match nights to Zenchef | Prepares, GM approves |
-| 📦 Purchasing | GMs, accounting | Invoice ↔ order ↔ price, approvals in Yooz, credit-note requests | Acts alone on matches |
-| 💶 Finance | Jean-Bernard, Stella, Sahira | Takings to Sage, banking file, payroll to P2M, beer duty ledger | Acts alone |
-| 🐸 Club Frog (pilot) | Emma, Liz, GMs | One KPI, win-back offers and new leads into OBY Pay | Prepares, Emma approves |
-| 🍻 Bookings & events | Tory, GMs | One booking view, deposit reminders, SMS after a missed call | Acts alone |
-| ✦ Frog Copilot | Everyone | Answers on figures and procedures, with sources | Read-only |
+| Close-of-service | SMs, GMs | Cash-up reconciled, Manager Report pre-filled and sent, hours synced | Prepares, SM confirms |
+| Rota (pilot) | GMs | Targets and recommended rota to Combo, match nights to Zenchef | Prepares, GM approves |
+| Purchasing | GMs, accounting | Invoice ↔ order ↔ price, approvals in Yooz, credit-note requests | Acts alone on matches |
+| Finance | Jean-Bernard, Stella, Sahira | Takings to Sage, banking file, payroll to P2M, beer duty ledger | Acts alone |
+| Club Frog (pilot) | Emma, Liz, GMs | One KPI, visit counter and rewards, invitations to bookers, win-back offers, new leads into OBY Pay, Monday report to GMs | Prepares, Emma approves |
+| Bookings & events | Tory, GMs | One booking list validated from the hub, AI receptionist pilot (Retell AI), confirmation calls, closure alerts, deposit reminders, SMS after a missed call | Acts alone |
+| Frog Copilot | Everyone | Answers on figures, procedures and open points, with sources | Read-only |
 
 **Delivery** (for Paul and Zuri): hours given back by team and by agent, euros protected, the delivery plan (delivered / pilot / next), the next agents ranked by impact (menu launch for 7 October first), a team pulse with a 30-second check-in, and the units behind every count (audit figures vs estimates to confirm).
 
@@ -70,14 +75,21 @@ The hub does not only show data: it sends the right data to the right tool. Each
 | Win back regulars | 10:00, unseen for 21 days | OBY Pay campaign | Emma's OK |
 | Missed call | Call missed | SMS with booking link (OVH) | Auto |
 | New leads | Meta lead or Typeform answer | OBY Pay contact | Auto |
+| Club Frog invitation | 10:00, bookings of the next day | Email to bookers who are not members | Auto |
+| Visit rewards | 10:30, 5th, 10th… visit | OBY Pay points credit | Emma's OK |
+| Club Frog weekly report | Monday 08:00 | Email to each GM | Auto |
+| Online bookings closed | GM closes bookings in Zenchef | Email to Liz, Paul and the GM | Auto |
+| Confirmation calls | 11:00, tables of 4+ tomorrow | Retell AI (pilot pubs) | Auto |
+| Beer menu | Price changed in Frog Hub | Zelty + Frog Space | Auto |
+| Booking decision | GM validates or declines | Zenchef (SMS to the guest) | Auto |
 
-The **Automations** workspace lists them all (switch on/off, change mode, Preview the exact data, Run now), shows what is **Waiting for OK**, the **Activity** of the day, everything **Sent to the tools** with its payload, and lets anyone create a new automation in three steps. Each role also has an Automations tab, and its approvals appear where they work (the GM's "Next week" step, Emma's Club Frog tab). People's actions are triggers too: sending an MR emails Paul, disputing an invoice emails the supplier.
+The **Agents & automations** workspace lists them all (switch on/off, change mode, Preview the exact data, Run now), shows what is **Waiting for OK**, the **Activity** of the day, everything **Sent to the tools** with its payload, and lets anyone create a new automation in three steps. Approvals appear where people work (the GM's This week tab, Emma's Club Frog report). People's actions are triggers too: sending an MR emails Paul, disputing an invoice emails the supplier, validating a booking writes to Zenchef, changing a beer price updates Zelty and Frog Space.
 
 Connectors are simulated in this prototype: the outbox shows exactly what would be sent to each tool.
 
 ## Frog Copilot
 
-- **Live figures**: 11 tools call the same hub functions as the screens (`lib/hub.mjs`), so the app and the assistant always give the same number.
+- **Live figures**: 16 tools call the same hub functions as the screens (including bookings of a service, phone and AI receptionist, closures, member visits and the open points) (`lib/hub.mjs`), so the app and the assistant always give the same number.
 - **Documentation (RAG)**: `search_docs` searches the audit (`ClubFrog - Zuri.md`), the process map (every step, pain point and the systems register) and every `.md`/`.txt` file in `knowledge/`. Add SOPs and software guides there and restart.
 - **Rules**: every figure comes from a tool call, every answer ends with its sources, and it answers in French or English.
 - Model: `claude-opus-5-5`, effort `medium`, with server-side fallback on refusals (`fallbacks: "default"`). Conversations are kept server-side and only appended to.
@@ -89,7 +101,8 @@ server.mjs          HTTP server: app, /api/view/*, /api/data/* (hub API), export
 lib/data.mjs        demo dataset (to replace with connectors)
 lib/hub.mjs         query layer: one definition per figure
 lib/workspaces.mjs  one workspace per role, built from the hub
-lib/actions.mjs     shared decisions (approve, dispute, send…)
+lib/actions.mjs     shared decisions (approve, dispute, validate, method chosen…)
+lib/processes.mjs   the 38 points of the process notes: status, coverage, methods to choose
 lib/agents.mjs      the 7 agents, impact units, roadmap, next agents, team pulse
 lib/automations.mjs automation engine: catalogue, triggers, approvals, activity log, outbox, builder
 lib/views.mjs       detailed module views (/api/view) and the MR export

@@ -2,32 +2,36 @@
 
 ## How the app is organised
 
-Frog Hub has one workspace per role, organised in tabs; a number on a tab shows what is left to do there. Each opens on what the hub has already done overnight (payments reconciled, reports pre-filled, invoices approved), then shows the few items that need a person, with the action right there. Every action can be undone for a few seconds. Clicking a row (an invoice, a server, an event) opens its details on the side; clicking a figure opens the tab that explains it; the ✦ Ask button sends a ready-made question to Frog Copilot. Decisions are shared: an invoice approved by a GM leaves the finance list too, and a Manager Report sent by a pub appears as received in Paul's view.
+The sidebar follows how Frog is organised: the pubs (one Pub team workspace, pick a pub), head office (Paul, Tory, Emma and Liz, Accounting, Sébastien) and the programme with Zuri (Open points, Agents and automations, Scorecard, Delivery). Inside a workspace, tabs follow the rhythm of the role: what happens tonight, the close of service, the Monday routine, the month. A number on a tab shows what is left to do there. Each tab opens on what needs a person, with the action right there (Validate, Approve, Dispute, Checked, Send) and an Undo for a few seconds; what the hub did on its own is a one-line summary. Rows open a detail panel, figures jump to the tab that explains them, and Ask Copilot sends a ready-made question. Decisions are shared: an invoice approved by a GM leaves the accounting list too.
+
+## Pub team (GM and SMs)
+
+Pick a pub. Tonight: every booking of the next service in one list by time (tables from Zenchef, darts from SimplyBook, groups from BookingShake, bookings taken by the AI receptionist), coloured by kind, with Validate or Decline for large tables and phone bookings (written back to Zenchef), an alert when online bookings are closed in Zenchef, and yesterday's calls. Close of service: cash-up, paper meal vouchers, Manager Report, hours, as a guided list. This week (the GM's Monday): next week's rota and match nights to approve, invoices to review, the tilrec pre-filled by payment mode with the banking file, Club Frog by shift manager and by server. Phone: calls answered, missed and taken by the AI receptionist, with transcripts (pilot pubs). Beer menu: Frog Space and Zelty prices side by side; a change is sent to both. Team and guests: takings by server, rota, guest habits. Open points: the process-note points for the pubs.
 
 ## Paul (CEO)
 
-Group revenue for the day and the month against budget, average ticket, labour cost and Club Frog participation. A daily revenue chart, the month by pub against budget, and a table of the 8 pubs with the status of each Manager Report. "For your attention" lists business points only, such as a pub far from its budget or the group events of the week, each with a question ready for Frog Copilot.
+Today: group revenue against budget, business points for attention (pubs off budget, labour, online bookings closed tonight, group events) and the decisions from the process notes waiting for Paul. Pubs, Trends, Guests, Costs (staff cost by pub, ad spend per online booking; capex not connected yet), Scorecard and Open points.
 
-## Finance (Jean-Bernard, Stella, Sahira)
+## Tory (operations, groups, bookings)
 
-Last week's takings reconciled for the 8 pubs, split by payment mode. Ready-to-download files: Sage entries, the banking file for all pubs and the payroll hours for P2M (Silae). Invoices that do not match their order or the agreed price are listed with Approve or Dispute with supplier; all others are approved automatically and duplicates are blocked. Group receivables, the beer duty ledger and payroll hours complete the page.
+Bookings: the next service of the 8 pubs side by side, bookings to validate in every pub, guests and channels of the month. Group events with payment status read from the bank and automatic reminders. Phone: calls of the 8 pubs and what the AI receptionist did.
 
-## Pub managers (GM and SM)
+## Emma and Liz (Club Frog and marketing)
 
-Pick a pub. Tabs: Close of service, Guests, Team, Invoices. The close of service is a guided list of four steps (cash-up, Manager Report, hours, invoices) with a progress bar; each step opens on what is left to do, and the Manager Report notes are saved as a draft while typing. Guests shows how customers consume: spend per guest, pints per guest, share of tickets with food, member against non-member spend, regulars coming back and how often, by moment of the day and by weekday, plus the best regulars and the servers with the highest spend per guest. Team shows takings by server, the Club Frog leaders and the rota of the day.
+Club Frog report: one rate, filters by day, 7 days or month, by pub, day, moment, server or shift manager, members per bill, and the win-back offers and 5th-visit rewards to approve. Members: visits counted by the hub (OBY Pay cannot count them), rewards, what members spend through Club Frog, contacts not linked to a pub. Acquisition: invitations sent to bookers before their visit, leads from Meta and Typeform. Channels and attribution: evenings when online bookings were closed and the ad spend that went to a closed calendar, bookings by channel, website clicks, Reserve with Google.
 
-## Operations & events (Tory)
+## Accounting (Jean-Bernard, Stella, Sahira)
 
-All bookings of the 8 pubs in one view, the upcoming group events with their payment status read from the bank, deposit reminders scheduled automatically (or sent now), covers booked by pub and bookings by channel.
+To do: files to download (Sage, banking, payroll), invoices to review, meal-voucher batches to check. Takings by payment mode, Meal vouchers (read by OCR at cash-up, by issuer), Bank reconciliation (what should reach the bank, method to choose), Receivables and beer duty, Payroll (with the Combo to Silae process to verify).
 
-## Marketing & CRM (Emma, Liz)
+## Sébastien (data and IT)
 
-Club Frog participation measured the same way in every pub, by pub, by shift and by server, with member and non-member average spend. Booking channels by pub, website clicks against bookings, and Reserve with Google share.
+Connectors with their method and last sync (including the Retell AI pilot, ad accounts, and what is not connected yet: Trail, the Frog Space beer list), automatic data corrections, roll-out, everything sent to the tools.
 
-## Data hub (Sébastien)
+## Open points
 
-Every connector with its method (API, webhooks, daily file, OCR), its last sync and the records loaded. The automatic corrections applied to the data (payments credited to the right server, payment modes taken from the terminal, booking sources mapped to one channel list, duplicate invoices blocked) and the roll-out plan of the remaining connectors.
+Every pain point of the process notes (knowledge/pain-process.md) with its status: in Frog Hub, partly covered, pilot to test, method to choose, to verify, or outside the scope. Each point says what Frog Hub does today and what is still open. Where the notes give no direct solution, two or three methods are proposed with how they work, for and against, effort, the recommended one and who decides; the chosen method is recorded in the app. Each team also has an Open points tab with its own points.
 
 ## Frog Copilot
 
-An assistant for everyone, in French or English. It answers with live figures from the hub (by calling the same functions as the app) and with the company documentation: the audit, the process map, the KPI definitions and any SOP or software guide added to the knowledge base. Every answer names its sources. It does not invent figures: if a figure is not in the hub, it says which connector is missing.
+An assistant for everyone, in French or English. It answers with live figures from the hub (by calling the same functions as the app), with the open points of the process notes, and with the company documentation: the audit, the process map, the KPI definitions and any SOP or software guide added to the knowledge base. Every answer names its sources. It does not invent figures: if a figure is not in the hub, it says which connector is missing.

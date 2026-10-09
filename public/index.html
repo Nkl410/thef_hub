@@ -5,22 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Frog Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <div class="app">
   <aside class="side">
     <div class="brand">
-      <div class="logo">Frog <em>Hub</em></div>
+      <div class="logo">Frog Hub</div>
       <div class="sub">Frog Pubs · 8 pubs</div>
     </div>
-    <div class="side-label">Workspace</div>
     <nav id="nav" aria-label="Workspaces"></nav>
-    <div class="pubpick" id="pubpick" hidden>
-      <label for="pub">Pub</label>
-      <select id="pub"></select>
-    </div>
+    <select id="pub" aria-label="Pub"></select>
     <div class="side-foot">
       <div class="sync"><span class="live"></span>All sources synced · 05:58</div>
       <button class="linkish" id="open-defs">Definitions</button>
